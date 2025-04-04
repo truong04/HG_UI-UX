@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Chat</title>
+    <style>
+        /* Full-screen background */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Header */
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        /* Chat container: centered, scrollable, with a max height */
+        .chat-container {
+            flex: 1;
+            width: 90%;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px 0;
+            box-sizing: border-box;
+            max-height: 70vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        .chat-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            word-wrap: break-word;
+            max-width: 80%;
+        }
+        /* User message: aligned to right */
+        .user {
+            background-color: #e9ecef; /* Light gray */
+            color: #000;
+            align-self: flex-end;
+            text-align: left;
+        }
+        /* Bot message: aligned to left with increased line spacing */
+        .bot {
+            background-color: #f9f9f9;
+            color: #000;
+            align-self: flex-start;
+            text-align: left;
+            line-height: 1.8; /* Increased line spacing */
+        }
+        /* Bottom container that holds input bar and disclaimer */
+        .bottom-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 720px;
+            box-sizing: border-box;
+        }
+        /* Fixed unified input container (inside the bottom container) */
+        .input-container {
+            position: relative;
+            width: 100%;
+            background: #f7f7f7;
+            border: 2px solid #ccc;
+            border-radius: 15px;
+            padding: 8px;
+            display: flex;
+            align-items: flex-end;
+        }
+        .input-container textarea {
+            width: calc(100% - 70px); /* Leave space for send button */
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            outline: none;
+            background: transparent;
+            box-sizing: border-box;
+            resize: none;
+            overflow-y: auto; /* Allow internal scrolling */
+            min-height: 80px;
+            max-height: 200px; /* Maximum height before scrolling */
+        }
+        .input-container button {
+            position: absolute;
+            right: 8px;
+            bottom: 8px; /* Positioned at bottom right */
+            width: 37px;
+            height: 37px;
+            background-color: black;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .input-container button svg {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+        /* Disclaimer styling */
+        .disclaimer {
+            text-align: center;
+            font-size: 12px;
+            color: gray;
+            margin-top: 5px;
+        }
+        /* Typing animation (bouncing dots) */
+        .typing {
+            display: flex;
+            align-items: center;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            margin: 0 2px;
+            background-color: gray;
+            border-radius: 50%;
+            animation: bounce 1.5s infinite;
+        }
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.3;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+<h1>Law Chat</h1>
+<!-- Chat container for messages -->
+<div class="chat-container" id="chat"></div>
+
+<!-- Bottom container holds both the input bar and the disclaimer -->
+<div class="bottom-container">
+    <div class="input-container">
+        <textarea id="questionInput" placeholder="Send a message..." rows="2"></textarea>
+        <button id="sendBtn">
+            <!-- Upward arrow icon (using inline SVG) -->
+            <svg viewBox="0 0 24 24" fill="white">
+                <path d="M12 4 L6 10 H18 Z" />
+                <rect x="10.5" y="8" width="3" height="10" rx="1" />
+            </svg>
+        </button>
+    </div>
+    <div class="disclaimer">
+        Law Chat can make mistakes. Check important info.
+    </div>
+</div>
+
+<script>
+    // Flag to prevent multiple sends while processing
+    let isProcessing = false;
+
+    // Auto-resize the textarea on input
+    const textarea = document.getElementById("questionInput");
+    textarea.addEventListener("input", function() {
+        this.style.height = "auto";
+        this.style.height = this.scrollHeight + "px";
+    });
+
+    // Allow Enter (without Shift) to send message
+    textarea.addEventListener("keydown", function(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById("sendBtn").click();
+        }
+    });
+
+    // Function to scroll to the bottom of chat
+    function scrollToBottom() {
+        const chatDiv = document.getElementById("chat");
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    document.getElementById("sendBtn").addEventListener("click", function() {
+        if (isProcessing) return;  // Prevent sending if one is in progress.
+        isProcessing = true;
+
+        const question = document.getElementById("questionInput").value;
+        if (!question.trim()) {
+            isProcessing = false;
+            return;
+        }
+        const chatDiv = document.getElementById("chat");
+        // Append user's message (aligned right)
+        const userMessage = `<div class='message user'>${question}</div>`;
+        chatDiv.innerHTML += userMessage;
+        document.getElementById("questionInput").value = "";
+        scrollToBottom();
+
+        // Add bouncing dots animation while waiting for response
+        const typingMessage = document.createElement("div");
+        typingMessage.className = "message bot typing";
+        typingMessage.innerHTML = `<span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+        chatDiv.appendChild(typingMessage);
+        scrollToBottom();
+
+        // Fetch the formatted response from n8n
+        fetch("https://noble-coyote-measured.ngrok-free.app/webhook/8e9405e9-c585-4fbb-9bf0-99397fa8682c", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question: question })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Received data:", data);
+                chatDiv.removeChild(typingMessage); // Remove loading animation
+
+                const botMessageDiv = document.createElement("div");
+                botMessageDiv.className = "message bot";
+                const finalHTML = (data.documents && data.documents.length) ? data.documents[0] : "<p>No formatted text returned.</p>";
+                // Create a temporary element to extract plain text for typewriter effect.
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = finalHTML;
+                const plainText = tempDiv.innerText || tempDiv.textContent;
+                let words = plainText.split(" ");
+                let index = 0;
+                botMessageDiv.innerHTML = "";
+                chatDiv.appendChild(botMessageDiv);
+                scrollToBottom();
+                function typeNextWord() {
+                    if (index < words.length) {
+                        botMessageDiv.innerHTML += words[index] + " ";
+                        index++;
+                        scrollToBottom();
+                        setTimeout(typeNextWord, 40);
+                    } else {
+                        botMessageDiv.innerHTML = finalHTML;
+                        scrollToBottom();
+                        isProcessing = false; // Reset flag after processing
+                    }
+                }
+                typeNextWord();
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                chatDiv.removeChild(typingMessage);
+                chatDiv.innerHTML += `<div class='message bot'>Error retrieving documents.</div>`;
+                scrollToBottom();
+                isProcessing = false; // Reset flag in case of error
+            });
+    });
+</script>
+</body>
+</html>
